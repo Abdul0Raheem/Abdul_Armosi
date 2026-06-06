@@ -3,5 +3,12 @@
   "version": "1.0.0",
   "dependencies": {
     "firebase": "^12.13.0"
+  },
+
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
   }
 }
