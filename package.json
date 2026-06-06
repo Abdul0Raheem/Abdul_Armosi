@@ -1,0 +1,7 @@
+{
+  "name": "armosi-frontend",
+  "version": "1.0.0",
+  "dependencies": {
+    "firebase": "^12.13.0"
+  }
+}
