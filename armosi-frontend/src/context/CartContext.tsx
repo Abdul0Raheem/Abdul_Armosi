@@ -8,6 +8,7 @@ const CART_STORAGE_KEY = 'armosi-cart';
 interface CartContextValue {
   cart: CartItem[];
   addToCart: (p: Product) => void;
+  isInCart: (id: Product['id']) => boolean;
   changeQty: (id: Product['id'], delta: number) => void;
   clearCart: () => void;
   cartCount: () => number;
@@ -50,12 +51,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const addToCart = useCallback((p: Product) => {
     setCart(prev => {
       const existing = prev.find(i => i.id === p.id);
-      if (existing) {
-        return prev.map(i => i.id === p.id ? { ...i, qty: i.qty + 1 } : i);
-      }
+      if (existing) return prev;
       return [...prev, { ...p, qty: 1 }];
     });
   }, []);
+
+  const isInCart = useCallback((id: Product['id']) => cart.some(item => item.id === id), [cart]);
 
   const changeQty = useCallback((id: Product['id'], delta: number) => {
     setCart(prev => {
@@ -72,7 +73,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const cartTotal = useCallback(() => cart.reduce((s, i) => s + i.price * i.qty, 0), [cart]);
 
   return (
-    <CartContext.Provider value={{ cart, addToCart, changeQty, clearCart, cartCount, cartTotal }}>
+    <CartContext.Provider value={{ cart, addToCart, isInCart, changeQty, clearCart, cartCount, cartTotal }}>
       {children}
     </CartContext.Provider>
   );

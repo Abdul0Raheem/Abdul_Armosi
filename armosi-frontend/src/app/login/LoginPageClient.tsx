@@ -4,9 +4,11 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
+import { BackButton } from '@/components/common/BackButton';
 import { PasswordField } from '@/components/common/PasswordField';
 import { useAuth } from '@/context/AuthContext';
-import { completeGoogleRedirectSignIn, getAuthErrorMessage } from '@/lib/auth';
+import { useToast } from '@/context/ToastContext';
+import { completeGoogleRedirectSignIn, getAuthErrorMessage, sendPasswordReset } from '@/lib/auth';
 
 type LoginMode = 'signin' | 'signup' | 'admin';
 
@@ -73,6 +75,7 @@ export default function LoginPageClient({
     roleLoading,
     loading: authLoading,
   } = useAuth();
+  const { toast } = useToast();
   const [mode, setMode] = useState<LoginMode>(initialMode);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -172,6 +175,26 @@ export default function LoginPageClient({
     }
   };
 
+  const handleForgotPassword = async () => {
+    setError('');
+
+    if (!email.trim()) {
+      setError('Enter your email first, then request a password reset.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await sendPasswordReset(email);
+      toast('Password reset email sent');
+    } catch (err) {
+      setError(getAuthErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (authLoading || checkingRedirect || user) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -191,6 +214,14 @@ export default function LoginPageClient({
       padding: '32px 20px 48px',
       background: 'radial-gradient(ellipse 80% 50% at 50% 0%,var(--vmid),var(--white) 70%)',
     }}>
+      <BackButton
+        style={{
+          position: 'fixed',
+          top: 16,
+          left: 16,
+        }}
+      />
+
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 24 }}>
         <div style={{
           width: 76,
@@ -324,6 +355,28 @@ export default function LoginPageClient({
               inputStyle={fieldStyle}
             />
           </div>
+
+          {mode === 'signin' && (
+            <div style={{ marginTop: 9, textAlign: 'right' }}>
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                disabled={loading}
+                style={{
+                  border: 'none',
+                  background: 'none',
+                  color: 'var(--v)',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  fontFamily: 'var(--ff-body)',
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  padding: 0,
+                }}
+              >
+                Forgot Password?
+              </button>
+            </div>
+          )}
 
           {mode === 'signup' && (
             <div style={{ marginTop: 14 }}>

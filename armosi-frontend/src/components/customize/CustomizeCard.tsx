@@ -1,5 +1,6 @@
 import { CustomItem } from '@/lib/types';
 import { Product } from '@/lib/types';
+import { ProductImageFrame } from '@/components/common/ProductImageFrame';
 
 interface CustomizeCardProps {
   item: CustomItem | Product;
@@ -38,22 +39,14 @@ export function CustomizeCard({ item }: CustomizeCardProps) {
         color: 'inherit',
       }}
     >
-      <div style={{
-        height: 115,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 50,
-        background: item.bg || '#FFF8EC',
-      }}>
-        {image ? (
-          <img
-            src={image}
-            alt={item.name}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-          />
-        ) : (
-          item.emoji || 'Item'
-        )}
-      </div>
+      <ProductImageFrame
+        src={image}
+        alt={item.name}
+        fallbackText={item.emoji || 'Item'}
+        background="#FFFFFF"
+        height={115}
+        style={{ borderRadius: 0 }}
+      />
 
       <div style={{ padding: '11px 13px 13px', background: 'white' }}>
         <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 3 }}>{item.name}</div>

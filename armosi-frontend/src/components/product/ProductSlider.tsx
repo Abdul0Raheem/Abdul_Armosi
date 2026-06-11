@@ -19,7 +19,11 @@ export function ProductSlider({ products }: ProductSliderProps) {
       }}
     >
       {products.map(p => (
-        <ProductCard key={p.id} product={p} />
+        <ProductCard
+          key={p.id}
+          product={p}
+          style={{ flex: '0 0 142px', width: 142 }}
+        />
       ))}
     </div>
   );

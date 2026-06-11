@@ -2,6 +2,7 @@
 
 import { CartItem as CartItemType } from '@/lib/types';
 import { useCart } from '@/context/CartContext';
+import { ProductImageFrame } from '@/components/common/ProductImageFrame';
 
 interface CartItemProps {
   item: CartItemType;
@@ -9,24 +10,20 @@ interface CartItemProps {
 
 export function CartItem({ item }: CartItemProps) {
   const { changeQty } = useCart();
+  const imageUrl = item.imageUrl || item.image;
 
   return (
     <div style={{ display: 'flex', gap: 13, padding: '14px 18px', borderBottom: '1px solid var(--line)' }}>
       {/* Product image */}
-      <div style={{
-        width: 66, height: 66, borderRadius: 12, background: 'var(--surf)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 28, flexShrink: 0, overflow: 'hidden',
-      }}>
-        {item.image ? (
-          <img
-            src={item.image}
-            alt={item.name}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-          />
-        ) : (
-          item.emoji ?? 'Item'
-        )}
+      <div style={{ width: 66, minWidth: 66, borderRadius: 12, overflow: 'hidden' }}>
+        <ProductImageFrame
+          src={imageUrl}
+          alt={item.name}
+          fallbackText={item.emoji ?? 'Item'}
+          background="#FFFFFF"
+          height={66}
+          style={{ borderRadius: 12 }}
+        />
       </div>
 
       {/* Info */}

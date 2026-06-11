@@ -1,9 +1,11 @@
 'use client';
 
+import type { CSSProperties } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
+import { useAuth } from '@/context/AuthContext';
 import { useSearchOverlay } from '@/components/common/SearchOverlay';
 
 const SearchIcon = () => (
@@ -25,17 +27,38 @@ const desktopNavItems = [
   { name: 'Shop', href: '/shop' },
   { name: 'Customize', href: '/customize' },
   { name: 'About', href: '/about' },
-  { name: 'Profile', href: '/profile' },
 ];
+
+const profileItem = { name: 'Profile', href: '/profile' };
+
+const authLinkStyle = (variant: 'login' | 'signup'): CSSProperties => ({
+  height: 34,
+  padding: '0 13px',
+  background: variant === 'signup' ? 'var(--v)' : 'var(--vpale)',
+  border: variant === 'signup' ? 'none' : '1px solid rgba(108,72,197,.12)',
+  borderRadius: 100,
+  fontSize: 12.5,
+  fontFamily: 'var(--ff-body)',
+  color: variant === 'signup' ? 'white' : 'var(--v)',
+  fontWeight: 700,
+  cursor: 'pointer',
+  textDecoration: 'none',
+  display: 'flex',
+  alignItems: 'center',
+  whiteSpace: 'nowrap',
+  transition: 'background .18s, color .18s, transform .12s',
+});
 
 export function Navbar() {
   const pathname = usePathname();
   const { cartCount } = useCart();
+  const { user, loading } = useAuth();
   const { open } = useSearchOverlay();
 
   if (pathname === '/login' || pathname === '/signup' || pathname.startsWith('/admin')) return null;
 
   const count = cartCount();
+  const showAuthLinks = !loading && !user;
 
   return (
     <nav
@@ -91,7 +114,7 @@ export function Navbar() {
       </Link>
 
       <div className="desktop-nav" style={{ alignItems: 'center', gap: 6, flexShrink: 0 }}>
-        {desktopNavItems.map(item => {
+        {[...desktopNavItems, profileItem].map(item => {
           const isActive = item.href === '/'
             ? pathname === '/'
             : pathname.startsWith(item.href);
@@ -149,6 +172,33 @@ export function Navbar() {
 
       {/* Actions */}
       <div style={{ display: 'flex', gap: 7, alignItems: 'center', flexShrink: 0, minWidth: 0 }}>
+        {showAuthLinks && (
+          <>
+            <Link href="/login" className="auth-nav-link" style={authLinkStyle('login')}>
+              Login
+            </Link>
+            <Link href="/signup" className="auth-nav-link" style={authLinkStyle('signup')}>
+              Signup
+            </Link>
+          </>
+        )}
+
+        <Link href="/profile" className="mobile-profile-link" style={{
+          height: 34, padding: '0 13px',
+          background: 'var(--surf)',
+          border: 'none',
+          borderRadius: 100,
+          fontSize: 12.5,
+          fontFamily: 'var(--ff-body)',
+          color: 'var(--vdk)',
+          fontWeight: 500,
+          cursor: 'pointer',
+          textDecoration: 'none',
+          display: 'flex', alignItems: 'center',
+        }}>
+          Profile
+        </Link>
+
         <Link href="/about" className="mobile-about-link" style={{
           height: 34, padding: '0 13px',
           background: 'var(--surf)',

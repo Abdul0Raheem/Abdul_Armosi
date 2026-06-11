@@ -6,7 +6,11 @@ export interface Product {
   emoji?: string;
   bg?: string;
   image?: string;
+  imageUrl?: string;
   category?: string;
+  description?: string;
+  subcategory?: string;
+  tags?: string[];
 }
 
 export interface CartItem extends Product {

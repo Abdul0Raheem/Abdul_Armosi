@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { collection, addDoc, updateDoc, doc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { groupCategoriesByGroup } from "@/lib/admin/categories";
 import { resolveCategorySlug } from "@/lib/admin/categoryDefaults";
-import { prepareProductImage, withTimeout } from "@/lib/admin/productImage";
+import { uploadToCloudinary } from "@/lib/admin/cloudinary";
+import { withTimeout } from "@/lib/admin/productImage";
 import { parseStockInput } from "@/lib/admin/productUtils";
 import { Product, StoreCategory } from "@/lib/admin/types";
+import { ProductImageFrame } from '@/components/common/ProductImageFrame';
 
 interface ProductFormProps {
   product?: Product | null;
@@ -17,63 +19,10 @@ interface ProductFormProps {
   onCancel: () => void;
 }
 
-const MAX_IMAGE_DATA_URL_LENGTH = 280_000;
 const FIRESTORE_TIMEOUT_MS = 25_000;
 
-function loadImage(src: string) {
-  return new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("Could not read this image file."));
-    image.src = src;
-  });
-}
-
-function readFileAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error("Could not read this image file."));
-    reader.readAsDataURL(file);
-  });
-}
-
-async function compressImageToDataUrl(file: File) {
-  if (!file.type.startsWith("image/")) {
-    throw new Error("Please choose an image file.");
-  }
-
-  const originalDataUrl = await readFileAsDataUrl(file);
-  const image = await loadImage(originalDataUrl);
-  const maxSide = 720;
-  const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
-  const width = Math.max(1, Math.round(image.width * scale));
-  const height = Math.max(1, Math.round(image.height * scale));
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d");
-
-  if (!context) {
-    throw new Error("Your browser could not process this image.");
-  }
-
-  canvas.width = width;
-  canvas.height = height;
-  context.fillStyle = "#ffffff";
-  context.fillRect(0, 0, width, height);
-  context.drawImage(image, 0, 0, width, height);
-
-  for (const quality of [0.75, 0.65, 0.55, 0.45, 0.35, 0.28]) {
-    const dataUrl = canvas.toDataURL("image/jpeg", quality);
-    if (dataUrl.length <= MAX_IMAGE_DATA_URL_LENGTH) {
-      return dataUrl;
-    }
-  }
-
-  throw new Error("This image is still too large. Use a smaller photo or paste an image URL.");
-}
-
 function buildFormState(product?: Product | null) {
-  const image = product?.image || "";
+  const imageUrl = product?.imageUrl || product?.image || "";
   return {
     name: product?.name || "",
     description: product?.description || "",
@@ -83,8 +32,7 @@ function buildFormState(product?: Product | null) {
       product?.stock !== null && product?.stock !== undefined
         ? product.stock.toString()
         : "",
-    productImage: image,
-    imageUrlInput: image.startsWith("http://") || image.startsWith("https://") ? image : "",
+    existingImageUrl: imageUrl,
   };
 }
 
@@ -95,8 +43,20 @@ export default function ProductForm({
   onCancel,
 }: ProductFormProps) {
   const [formData, setFormData] = useState(() => buildFormState(product));
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState(() => formData.existingImageUrl);
+  const objectUrlRef = useRef("");
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+      }
+    };
+  }, []);
 
   const handleChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -108,50 +68,64 @@ export default function ProductForm({
     }));
   };
 
-  const handleImageUrlChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setFormData((prev) => ({
-      ...prev,
-      imageUrlInput: value,
-      productImage: value.trim(),
-    }));
-  };
-
-  const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setError("");
 
-    try {
-      const imageDataUrl = await compressImageToDataUrl(file);
-      setFormData((prev) => ({
-        ...prev,
-        productImage: imageDataUrl,
-        imageUrlInput: "",
-      }));
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setError(message);
+    if (!file.type.startsWith("image/")) {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = "";
+      }
+
+      setSelectedImage(null);
+      setImagePreviewUrl(formData.existingImageUrl);
+      setError("Please choose an image file.");
+      return;
     }
+
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    objectUrlRef.current = objectUrl;
+    setSelectedImage(file);
+    setImagePreviewUrl(objectUrl);
   };
 
   const clearImage = () => {
-    setFormData((prev) => ({
-      ...prev,
-      productImage: "",
-      imageUrlInput: "",
-    }));
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = "";
+    }
+
+    setSelectedImage(null);
+    setFormData((prev) => ({ ...prev, existingImageUrl: "" }));
+    setImagePreviewUrl("");
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
+    setUploading(false);
 
     try {
       const productId = product?.id;
-      const image = prepareProductImage(formData.productImage, product?.image);
+      let imageUrl = formData.existingImageUrl;
+
+      if (!selectedImage && !imageUrl) {
+        throw new Error("Please select a product image before saving.");
+      }
+
+      if (selectedImage) {
+        setUploading(true);
+        imageUrl = await uploadToCloudinary(selectedImage);
+        setUploading(false);
+      }
 
       const productData = {
         name: formData.name.trim(),
@@ -159,7 +133,8 @@ export default function ProductForm({
         price: parseFloat(formData.price) || 0,
         category: formData.category,
         stock: parseStockInput(formData.stock),
-        image,
+        imageUrl,
+        image: imageUrl,
         updatedAt: Timestamp.now(),
       };
 
@@ -183,6 +158,7 @@ export default function ProductForm({
       setLoading(false);
       onProductSaved();
     } catch (err) {
+      setUploading(false);
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes("permission") || message.includes("PERMISSION_DENIED")) {
         setError("Failed to save. Please log out and log in again.");
@@ -194,9 +170,9 @@ export default function ProductForm({
     }
   };
 
-  const hasUploadedImage = Boolean(formData.productImage);
-  const imageIsDataUrl = formData.productImage.startsWith("data:");
+  const hasSelectedImage = Boolean(imagePreviewUrl);
   const categoryGroups = groupCategoriesByGroup(categories);
+  const submitDisabled = loading || uploading;
 
   return (
     <div className="adm-card adm-card-padded" style={{ marginBottom: 24 }}>
@@ -290,7 +266,7 @@ export default function ProductForm({
         </div>
 
         <div>
-          <label className="adm-label">Product Image (optional)</label>
+          <label className="adm-label">Product Image</label>
           <input
             type="file"
             accept="image/*"
@@ -298,30 +274,27 @@ export default function ProductForm({
             className="adm-input"
             style={{ marginBottom: 12, paddingTop: 10, paddingBottom: 10 }}
           />
-          <label className="adm-label">Or paste image URL</label>
-          <input
-            type="url"
-            value={formData.imageUrlInput}
-            onChange={handleImageUrlChange}
-            placeholder="https://example.com/product-image.jpg"
-            className="adm-input"
-          />
           <p style={{ fontSize: 13, color: 'var(--adm-muted)', marginTop: 8 }}>
-            Tip: Image URL links save fastest. Phone uploads are compressed automatically.
+            Choose a product photo from your device. It will upload to Cloudinary when you save.
           </p>
-          {imageIsDataUrl && (
+          {uploading && (
             <p style={{ fontSize: 13, color: 'var(--adm-muted)', marginTop: 4 }}>
-              Photo ready from your device.
+              Uploading image...
             </p>
           )}
-          {hasUploadedImage && (
+          {hasSelectedImage && (
             <div style={{ marginTop: 16, display: 'flex', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
-              <img
-                src={formData.productImage}
-                alt="Preview"
-                style={{ width: 128, height: 128, objectFit: 'cover', borderRadius: 14, border: '1px solid var(--adm-line)' }}
-              />
-              <button type="button" onClick={clearImage} className="adm-btn adm-btn-ghost adm-btn-sm">
+              <div style={{ width: 128, minWidth: 128, borderRadius: 14, overflow: 'hidden', border: '1px solid var(--adm-line)' }}>
+                <ProductImageFrame
+                  src={imagePreviewUrl}
+                  alt="Preview"
+                  fallbackText="Preview unavailable"
+                  background="#FFFFFF"
+                  height={128}
+                  style={{ borderRadius: 14 }}
+                />
+              </div>
+              <button type="button" onClick={clearImage} disabled={submitDisabled} className="adm-btn adm-btn-ghost adm-btn-sm">
                 Remove image
               </button>
             </div>
@@ -329,10 +302,10 @@ export default function ProductForm({
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-          <button type="submit" disabled={loading} className="adm-btn adm-btn-primary">
-            {loading ? "Saving..." : product ? "Update Product" : "Save Product"}
+          <button type="submit" disabled={submitDisabled} className="adm-btn adm-btn-primary">
+            {uploading ? "Uploading image..." : loading ? "Saving..." : product ? "Update Product" : "Save Product"}
           </button>
-          <button type="button" onClick={onCancel} disabled={loading} className="adm-btn adm-btn-secondary">
+          <button type="button" onClick={onCancel} disabled={submitDisabled} className="adm-btn adm-btn-secondary">
             Cancel
           </button>
         </div>

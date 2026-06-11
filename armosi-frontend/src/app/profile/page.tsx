@@ -2,11 +2,14 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
+import { BackButton } from '@/components/common/BackButton';
+import { PasswordField } from '@/components/common/PasswordField';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { db } from '@/lib/firebase';
-import { getUserInitials } from '@/lib/auth';
+import { getAuthErrorMessage, getUserInitials, updateUserPassword } from '@/lib/auth';
 
 interface UserDetails {
   phone?: string;
@@ -41,6 +44,181 @@ const ChevronRight = () => (
     <path d="M9 18l6-6-6-6"/>
   </svg>
 );
+
+const fieldStyle = {
+  width: '100%',
+  height: 44,
+  background: 'var(--surf)',
+  border: '1.5px solid transparent',
+  borderRadius: 'var(--r)',
+  padding: '0 14px',
+  fontSize: 14,
+  fontFamily: 'var(--ff-body)',
+  color: 'var(--ink)',
+  outline: 'none',
+} as const;
+
+const labelStyle = {
+  fontSize: 11.5,
+  fontWeight: 700,
+  color: 'var(--mute)',
+  marginBottom: 6,
+  display: 'block',
+  letterSpacing: '.05em',
+  textTransform: 'uppercase' as const,
+};
+
+function ChangePasswordForm({ canChangePassword }: { canChangePassword: boolean }) {
+  const { toast } = useToast();
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState<'error' | 'success'>('error');
+  const [updating, setUpdating] = useState(false);
+
+  const resetForm = () => {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+  };
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    setMessage('');
+    setMessageType('error');
+
+    if (!canChangePassword) {
+      setMessage('Password changes are available for email/password accounts.');
+      return;
+    }
+
+    if (!currentPassword) {
+      setMessage('Current password is required.');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setMessage('New password should be at least 6 characters.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setMessage('Confirm password must match the new password.');
+      return;
+    }
+
+    setUpdating(true);
+
+    try {
+      await updateUserPassword(currentPassword, newPassword);
+      resetForm();
+      setMessageType('success');
+      setMessage('Password updated successfully.');
+      toast('Password updated successfully');
+    } catch (err) {
+      setMessage(getPasswordErrorMessage(err));
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} style={{ marginTop: 16, display: 'grid', gap: 13 }}>
+      {message && (
+        <div style={{
+          background: messageType === 'success' ? '#F0FFF4' : '#FFF0F3',
+          color: messageType === 'success' ? 'var(--green)' : 'var(--rose)',
+          fontSize: 13,
+          padding: '10px 12px',
+          borderRadius: 'var(--r)',
+          lineHeight: 1.45,
+        }}>
+          {message}
+        </div>
+      )}
+
+      <div>
+        <label style={labelStyle}>Current Password</label>
+        <PasswordField
+          variant="storefront"
+          value={currentPassword}
+          onChange={event => setCurrentPassword(event.target.value)}
+          placeholder="Current password"
+          autoComplete="current-password"
+          disabled={!canChangePassword || updating}
+          inputStyle={fieldStyle}
+        />
+      </div>
+
+      <div>
+        <label style={labelStyle}>New Password</label>
+        <PasswordField
+          variant="storefront"
+          value={newPassword}
+          onChange={event => setNewPassword(event.target.value)}
+          placeholder="New password"
+          autoComplete="new-password"
+          minLength={6}
+          disabled={!canChangePassword || updating}
+          inputStyle={fieldStyle}
+        />
+      </div>
+
+      <div>
+        <label style={labelStyle}>Confirm New Password</label>
+        <PasswordField
+          variant="storefront"
+          value={confirmPassword}
+          onChange={event => setConfirmPassword(event.target.value)}
+          placeholder="Confirm new password"
+          autoComplete="new-password"
+          minLength={6}
+          disabled={!canChangePassword || updating}
+          inputStyle={fieldStyle}
+        />
+      </div>
+
+      <button
+        type="submit"
+        disabled={!canChangePassword || updating}
+        style={{
+          width: '100%',
+          height: 48,
+          background: !canChangePassword || updating ? 'var(--vl)' : 'var(--v)',
+          color: 'white',
+          border: 'none',
+          borderRadius: 'var(--r)',
+          fontSize: 14.5,
+          fontFamily: 'var(--ff-body)',
+          fontWeight: 700,
+          cursor: !canChangePassword || updating ? 'not-allowed' : 'pointer',
+          letterSpacing: '.03em',
+          boxShadow: '0 8px 22px rgba(108,72,197,.28)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 9,
+        }}
+      >
+        {updating && <span className="armosi-spinner" />}
+        {updating ? 'Updating...' : 'Update Password'}
+      </button>
+    </form>
+  );
+}
+
+function getPasswordErrorMessage(error: unknown) {
+  const code = typeof error === 'object' && error && 'code' in error
+    ? String((error as { code: string }).code)
+    : '';
+
+  if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+    return 'Invalid current password.';
+  }
+
+  return getAuthErrorMessage(error);
+}
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -78,6 +256,7 @@ export default function ProfilePage() {
 
   const displayName = user.displayName || user.email?.split('@')[0] || 'Armosi Customer';
   const initials = getUserInitials(displayName);
+  const canChangePassword = user.providerData.some(provider => provider.providerId === 'password');
 
   const handleSignOut = async () => {
     await logout();
@@ -87,10 +266,19 @@ export default function ProfilePage() {
   return (
     <div className="page-body">
       <div style={{
+        position: 'relative',
         background: 'linear-gradient(145deg,var(--vpale),var(--vmid))',
         padding: 'calc(var(--nav) + 24px) 18px 26px',
         textAlign: 'center',
       }}>
+        <BackButton
+          style={{
+            position: 'absolute',
+            top: 'calc(var(--nav) + 12px)',
+            left: 16,
+          }}
+        />
+
         <div style={{
           width: 76,
           height: 76,
@@ -109,6 +297,20 @@ export default function ProfilePage() {
         </div>
         <h2 style={{ fontFamily: 'var(--ff-head)', fontSize: 26, marginBottom: 3 }}>{displayName}</h2>
         <p style={{ fontSize: 13, color: 'var(--mute)' }}>{user.email}</p>
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          marginTop: 8,
+          padding: '5px 10px',
+          borderRadius: 100,
+          background: user.emailVerified ? '#F0FFF4' : 'rgba(255,255,255,.7)',
+          color: user.emailVerified ? 'var(--green)' : 'var(--mute)',
+          fontSize: 11.5,
+          fontWeight: 700,
+        }}>
+          {user.emailVerified ? 'Email verified' : 'Email not verified'}
+        </div>
         {details.phone && (
           <p style={{ fontSize: 13, color: 'var(--mute)', marginTop: 6 }}>{details.phone}</p>
         )}
@@ -163,6 +365,57 @@ export default function ProfilePage() {
           </div>
           <span style={{ fontSize: 14.5, fontWeight: 500, color: 'var(--rose)' }}>Sign Out</span>
         </button>
+
+        <section style={{
+          marginTop: 18,
+          background: 'white',
+          border: '1px solid var(--line)',
+          borderRadius: 'var(--r-xl)',
+          padding: '20px',
+          boxShadow: 'var(--sh-md)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 40,
+              height: 40,
+              background: 'var(--vpale)',
+              borderRadius: 12,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="var(--v)" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="4" y="10" width="16" height="10" rx="2" />
+                <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+              </svg>
+            </div>
+            <div>
+              <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--ink)', marginBottom: 3 }}>
+                Account Settings
+              </h3>
+              <p style={{ fontSize: 13, color: 'var(--mute)', lineHeight: 1.4 }}>
+                Change Password
+              </p>
+            </div>
+          </div>
+
+          {!canChangePassword && (
+            <div style={{
+              marginTop: 14,
+              background: 'var(--surf)',
+              color: 'var(--mute)',
+              fontSize: 13,
+              padding: '10px 12px',
+              borderRadius: 'var(--r)',
+              lineHeight: 1.45,
+            }}>
+              This account uses Google sign-in. Manage your password from your Google account.
+            </div>
+          )}
+
+          <ChangePasswordForm canChangePassword={canChangePassword} />
+        </section>
       </div>
     </div>
   );

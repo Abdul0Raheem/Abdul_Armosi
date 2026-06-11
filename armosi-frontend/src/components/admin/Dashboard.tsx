@@ -68,6 +68,7 @@ export default function Dashboard({ initialTab = "orders" }: DashboardProps) {
       querySnapshot.forEach((document) => {
         const data = document.data();
         const stockValue = data.stock;
+        const imageUrl = data.imageUrl || data.image || "";
 
         productsData.push({
           id: document.id,
@@ -75,7 +76,8 @@ export default function Dashboard({ initialTab = "orders" }: DashboardProps) {
           description: data.description,
           price: data.price,
           category: data.category,
-          image: data.image,
+          image: imageUrl,
+          imageUrl,
           stock:
             stockValue === null || stockValue === undefined
               ? null

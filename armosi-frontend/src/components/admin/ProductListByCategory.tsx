@@ -3,6 +3,7 @@
 import type { Product, StoreCategory } from "@/lib/admin/types";
 import { formatStock, getCategoryLabel, groupProductsForAdmin } from "@/lib/admin/productUtils";
 import { groupCategoriesByGroup } from "@/lib/admin/categories";
+import { ProductImageFrame } from '@/components/common/ProductImageFrame';
 
 interface ProductListByCategoryProps {
   products: Product[];
@@ -22,15 +23,18 @@ function ProductCard({
   onEdit: (product: Product) => void;
   onDelete: (id: string) => void;
 }) {
+  const imageUrl = product.imageUrl || product.image;
+
   return (
     <div className="adm-card" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-      {product.image ? (
-        <img src={product.image} alt={product.name} style={{ width: '100%', height: 160, objectFit: 'cover' }} />
-      ) : (
-        <div style={{ width: '100%', height: 160, background: 'var(--adm-primary-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--adm-muted)', fontSize: 13 }}>
-          No image
-        </div>
-      )}
+      <ProductImageFrame
+        src={imageUrl}
+        alt={product.name}
+        fallbackText="No image"
+        background="#FFFFFF"
+        height={160}
+        style={{ borderRadius: 0 }}
+      />
       <div style={{ padding: 16, display: 'flex', flexDirection: 'column', flex: 1 }}>
         <h4 style={{ fontWeight: 700, color: 'var(--adm-ink)', marginBottom: 4 }}>{product.name}</h4>
         <p style={{ color: 'var(--adm-muted)', fontSize: 13, marginBottom: 12, lineHeight: 1.45, flex: 1, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>

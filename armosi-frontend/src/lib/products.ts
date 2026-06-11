@@ -2,6 +2,8 @@ import { listFirestoreDocuments } from './firestoreRest';
 import { getStoreCategories, resolveCategorySlug, type StoreCategory } from './categories';
 import { D } from './data';
 import { Product } from './types';
+import { db } from './firebase';
+import { doc as firestoreDoc, getDoc } from 'firebase/firestore';
 
 type FirestoreValue = {
   stringValue?: string;
@@ -45,6 +47,9 @@ function toProduct(document: FirestoreProductDocument): SavedProduct | null {
   const name = String(fieldToValue(fields.name) || '').trim();
   const price = Number(fieldToValue(fields.price) || 0);
   const rawCategory = String(fieldToValue(fields.category) || '').trim();
+  const imageUrl = sanitizeProductImage(
+    String(fieldToValue(fields.imageUrl) || fieldToValue(fields.image) || ''),
+  );
 
   if (!name || !price || !rawCategory) return null;
 
@@ -53,7 +58,9 @@ function toProduct(document: FirestoreProductDocument): SavedProduct | null {
     name,
     price,
     mrp: Number(fieldToValue(fields.mrp) || 0) || undefined,
-    image: sanitizeProductImage(String(fieldToValue(fields.image) || '')),
+    image: imageUrl,
+    imageUrl,
+    description: String(fieldToValue(fields.description) || fieldToValue(fields.desc) || '').trim() || undefined,
     bg: '#FFF8EC',
     emoji: '🛍️',
     category: resolveCategorySlug(rawCategory),
@@ -134,6 +141,68 @@ export async function getSavedProducts() {
 
 export function allSavedProducts(groups: ProductsByCategory) {
   return Object.values(groups).flat();
+}
+
+export function findFallbackProductById(productId: string | number): Product | null {
+  const searchId = String(productId).trim();
+  for (const products of Object.values(D)) {
+    const found = products.find((item) => String(item.id).trim() === searchId);
+    if (found) return found;
+  }
+  return null;
+}
+
+export async function getSavedProductById(productId: string | number): Promise<Product | null> {
+  const searchId = String(productId).trim();
+
+  // Try direct Firestore document lookup by ID first
+  try {
+    const docRef = firestoreDoc(db, 'products', searchId);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[getSavedProductById] Firestore doc exists for', searchId);
+      }
+      return {
+        id: String(snap.id),
+        name: String(data?.name || data?.title || 'Unnamed Product'),
+        price: Number(data?.price || 0),
+        mrp: data?.mrp != null ? Number(data.mrp) : undefined,
+        image: data?.image || data?.imageUrl || undefined,
+        imageUrl: data?.imageUrl || data?.image || undefined,
+        description: String(data?.description || data?.desc || '').trim() || undefined,
+        bg: data?.bg || undefined,
+        emoji: data?.emoji || undefined,
+        category: data?.category ? resolveCategorySlug(String(data.category)) : undefined,
+        tags: Array.isArray(data?.tags) ? data.tags : undefined,
+      };
+    }
+  } catch (err) {
+    if (process.env.NODE_ENV === 'development') console.error('[getSavedProductById] Firestore getDoc error', err);
+  }
+
+  // Fall back to saved groups and in-memory data
+  const groups = await getSavedProductsByCategory();
+  const product = allSavedProducts(groups).find((item) => String(item.id).trim() === searchId);
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[getSavedProductById] searchId=', searchId, 'foundSaved=', Boolean(product));
+  }
+
+  const fallback = product || findFallbackProductById(searchId);
+
+  if (process.env.NODE_ENV === 'development' && !fallback) {
+    console.log('[getSavedProductById] fallback search failed for', searchId);
+  }
+
+  return fallback;
+}
+
+export function getRelatedProducts(product: Product, products: Product[], limit = 4) {
+  return products
+    .filter((item) => String(item.id) !== String(product.id) && item.category === product.category)
+    .slice(0, limit);
 }
 
 export function hasSavedProducts(products: Product[]) {

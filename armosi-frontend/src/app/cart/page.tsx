@@ -209,6 +209,7 @@ function getBestCurrentPosition() {
         }
       },
       error => {
+        navigator.geolocation.clearWatch(watchId);
         if (bestPosition) {
           finish();
           return;
@@ -368,7 +369,7 @@ export default function CartPage() {
               address: prev.address || locationDetails.address,
               city: prev.city || locationDetails.city,
               state: prev.state || locationDetails.state,
-              pincode: prev.pincode || locationDetails.pincode.replace(/\D/g, '').slice(0, 6),
+              pincode: prev.pincode || (locationDetails.pincode ? locationDetails.pincode.replace(/\D/g, '').slice(0, 6) : prev.pincode),
             }));
 
             if (locationDetails.city && locationDetails.pincode) {
@@ -385,9 +386,18 @@ export default function CartPage() {
           setIsLocating(false);
         }
       })
-      .catch(() => {
+      .catch((error) => {
         setIsLocating(false);
-        toast('Could not access location. You can still enter your address manually.');
+        console.error('captureLocation error', error);
+        if (error?.code === 1) {
+          toast('Location permission denied. Please allow location access in your browser.');
+        } else if (error?.code === 2) {
+          toast('Could not determine your location. Try again or enter your address manually.');
+        } else if (error?.code === 3) {
+          toast('Location request timed out. Please try again.');
+        } else {
+          toast('Could not access location. You can still enter your address manually.');
+        }
       });
   };
 
