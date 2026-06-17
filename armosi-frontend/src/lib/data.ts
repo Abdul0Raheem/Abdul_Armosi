@@ -81,6 +81,21 @@ export const D: Record<string, Product[]> = {
   ],
 };
 
+export function getFallbackProducts(): Product[] {
+  return Object.entries(D).flatMap(([category, products]) =>
+    products.map((product) => ({
+      ...product,
+      category: product.category || category,
+      description: product.description || `Premium ${product.name} from Armosi.`,
+    })),
+  );
+}
+
+export function getFallbackProductById(productId: string | number): Product | null {
+  const searchId = String(productId).trim();
+  return getFallbackProducts().find((product) => String(product.id).trim() === searchId) || null;
+}
+
 export const CUSTOM_ITEMS: CustomItem[] = [
   { name: 'Customize Pad', sub: 'Personalised writing pad', emoji: '📝', bg: 'linear-gradient(145deg,#FFF0F4,#FFD6E0)' },
   { name: 'Customize Dairy', sub: 'Name & cover design', emoji: '📗', bg: 'linear-gradient(145deg,#E4F0FF,#C8DEFF)' },

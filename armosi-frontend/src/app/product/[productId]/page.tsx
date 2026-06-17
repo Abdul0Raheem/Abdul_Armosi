@@ -3,17 +3,18 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ProductImageFrame } from '@/components/common/ProductImageFrame';
 import { ProductDetailActions } from '@/components/product/ProductDetailActions';
-import { getSavedProductById, getSavedProductsByCategory, allSavedProducts } from '@/lib/products';
+import { getSavedProductById, getSavedProductsByCategory, getAllSavedAndFallbackProducts, allSavedProducts } from '@/lib/products';
 import RevealOnScroll from '@/components/common/RevealOnScroll';
 import RelatedProductsScroller from '@/components/product/RelatedProductsScroller';
 
 interface ProductPageProps {
-  params: { productId: string };
+  params: Promise<{ productId: string }>;
 }
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
-  const productId = String(params.productId || '').trim();
-  const product = await getSavedProductById(productId);
+  const { productId } = await params;
+  const searchId = String(productId || '').trim();
+  const product = await getSavedProductById(searchId);
 
   if (!product) {
     return {
@@ -29,14 +30,15 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 }
 
 export default async function ProductPage({ params }: ProductPageProps) {
-  const productId = String(params.productId || '').trim();
-  const product = await getSavedProductById(productId);
+  const { productId } = await params;
+  const searchId = String(productId || '').trim();
+  const product = await getSavedProductById(searchId);
 
   if (!product) {
     if (process.env.NODE_ENV === 'development') {
       const savedByCategory = await getSavedProductsByCategory();
       const all = allSavedProducts(savedByCategory);
-      console.log('[ProductPage] params.productId=', productId, 'NOT found; savedCount=', all.length, 'sampleIds=', all.slice(0, 20).map((p) => p.id));
+      console.log('[ProductPage] params.productId=', searchId, 'NOT found; savedCount=', all.length, 'sampleIds=', all.slice(0, 20).map((p) => p.id));
 
       return (
         <div className="page-body" style={{ paddingTop: 18, paddingBottom: 34 }}>
@@ -64,16 +66,17 @@ export default async function ProductPage({ params }: ProductPageProps) {
   }
 
   if (process.env.NODE_ENV === 'development') {
-    console.log('[ProductPage] params.productId=', productId, 'resolved productId=', product.id);
+    console.log('[ProductPage] params.productId=', searchId, 'resolved productId=', product.id, 'category=', product.category);
   }
 
   const savedByCategory = await getSavedProductsByCategory();
-  const sameCategoryProducts = allSavedProducts(savedByCategory).filter(
+  const allProducts = getAllSavedAndFallbackProducts(savedByCategory);
+  const sameCategoryProducts = allProducts.filter(
     (item) => String(item.id) !== String(product.id) && item.category === product.category,
   );
   const relatedProducts = sameCategoryProducts.length > 0
     ? sameCategoryProducts
-    : allSavedProducts(savedByCategory).filter((item) => String(item.id) !== String(product.id));
+    : allProducts.filter((item) => String(item.id) !== String(product.id));
   const visibleProducts = relatedProducts.slice(0, 4);
 
   return (

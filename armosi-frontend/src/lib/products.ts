@@ -1,6 +1,6 @@
 import { listFirestoreDocuments } from './firestoreRest';
 import { getStoreCategories, resolveCategorySlug, type StoreCategory } from './categories';
-import { D } from './data';
+import { D, getFallbackProducts as getFallbackProductsFromData, getFallbackProductById as getFallbackProductFromData } from './data';
 import { Product } from './types';
 import { db } from './firebase';
 import { doc as firestoreDoc, getDoc } from 'firebase/firestore';
@@ -143,13 +143,19 @@ export function allSavedProducts(groups: ProductsByCategory) {
   return Object.values(groups).flat();
 }
 
+export function getAllSavedAndFallbackProducts(groups: ProductsByCategory) {
+  const all = [...allSavedProducts(groups), ...getFallbackProductsFromData()];
+  return Object.values(
+    all.reduce<Record<string, Product>>((acc, product) => {
+      const key = String(product.id);
+      if (!acc[key]) acc[key] = product;
+      return acc;
+    }, {}),
+  );
+}
+
 export function findFallbackProductById(productId: string | number): Product | null {
-  const searchId = String(productId).trim();
-  for (const products of Object.values(D)) {
-    const found = products.find((item) => String(item.id).trim() === searchId);
-    if (found) return found;
-  }
-  return null;
+  return getFallbackProductFromData(productId);
 }
 
 export async function getSavedProductById(productId: string | number): Promise<Product | null> {
@@ -192,6 +198,10 @@ export async function getSavedProductById(productId: string | number): Promise<P
 
   const fallback = product || findFallbackProductById(searchId);
 
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[getSavedProductById] searchId=', searchId, 'foundSaved=', Boolean(product), 'foundFallback=', Boolean(fallback));
+  }
+
   if (process.env.NODE_ENV === 'development' && !fallback) {
     console.log('[getSavedProductById] fallback search failed for', searchId);
   }
@@ -215,7 +225,7 @@ export function pickProducts(saved: Product[], fallback: Product[]) {
 
 export function getFallbackForCategory(category: StoreCategory): Product[] {
   if (category.fallbackKey && category.fallbackKey in D) {
-    return D[category.fallbackKey as keyof typeof D] || [];
+    return (D[category.fallbackKey as keyof typeof D] || []).slice(0, 1);
   }
   return [];
 }

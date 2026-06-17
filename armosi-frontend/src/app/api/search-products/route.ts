@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { D } from '@/lib/data';
+import { getFallbackProducts } from '@/lib/data';
 import { getStoreCategories } from '@/lib/categories';
 import {
   allSavedProducts,
@@ -36,9 +36,7 @@ export async function GET() {
       .map((product) => ({ ...product, category: product.category || category.id }));
   });
 
-  const fallbackSearchProducts = Object.entries(D).flatMap(([category, products]) => (
-    products.map(product => ({ ...product, category: product.category || category }))
-  ));
+  const fallbackSearchProducts = getFallbackProducts();
 
   const products = (savedProducts.length > 0 ? savedProducts : fallbackSearchProducts)
     .concat(fallbackProducts)

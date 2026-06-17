@@ -62,7 +62,7 @@ export function Navbar() {
 
   return (
     <nav
-      className="app-fixed"
+      className="app-fixed top-navbar"
       style={{
         position: 'fixed',
         top: 0,
@@ -84,7 +84,7 @@ export function Navbar() {
       }}
     >
       {/* Logo */}
-      <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', flexShrink: 0, minWidth: 0 }}>
+      <Link href="/" className="navbar-logo" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', flexShrink: 0, minWidth: 0 }}>
         <div style={{
           width: 38,
           height: 38,
@@ -108,7 +108,7 @@ export function Navbar() {
             }}
           />
         </div>
-        <span style={{ fontFamily: 'var(--ff-head)', fontSize: 20, fontWeight: 500, color: 'var(--vdk)', letterSpacing: '.05em', whiteSpace: 'nowrap' }}>
+        <span className="navbar-brand-text" style={{ fontFamily: 'var(--ff-head)', fontSize: 20, fontWeight: 500, color: 'var(--vdk)', letterSpacing: '.05em', whiteSpace: 'nowrap' }}>
           Armosi
         </span>
       </Link>
@@ -147,7 +147,7 @@ export function Navbar() {
       </div>
 
       {/* Search */}
-      <div style={{ flex: '1 1 auto', minWidth: 0, position: 'relative' }}>
+      <div className="navbar-search" style={{ flex: '1 1 auto', minWidth: 0, position: 'relative' }}>
         <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }}>
           <SearchIcon />
         </span>
@@ -171,19 +171,19 @@ export function Navbar() {
       </div>
 
       {/* Actions */}
-      <div style={{ display: 'flex', gap: 7, alignItems: 'center', flexShrink: 0, minWidth: 0 }}>
+      <div className="navbar-actions" style={{ display: 'flex', gap: 7, alignItems: 'center', flexShrink: 0, minWidth: 0 }}>
         {showAuthLinks && (
           <>
-            <Link href="/login" className="auth-nav-link" style={authLinkStyle('login')}>
+            <Link href="/login" className="auth-nav-link navbar-action-link" style={authLinkStyle('login')}>
               Login
             </Link>
-            <Link href="/signup" className="auth-nav-link" style={authLinkStyle('signup')}>
+            <Link href="/signup" className="auth-nav-link navbar-action-link" style={authLinkStyle('signup')}>
               Signup
             </Link>
           </>
         )}
 
-        <Link href="/profile" className="mobile-profile-link" style={{
+        <Link href="/profile" className="mobile-profile-link navbar-action-link" style={{
           height: 34, padding: '0 13px',
           background: 'var(--surf)',
           border: 'none',
@@ -199,23 +199,7 @@ export function Navbar() {
           Profile
         </Link>
 
-        <Link href="/about" className="mobile-about-link" style={{
-          height: 34, padding: '0 13px',
-          background: 'var(--surf)',
-          border: 'none',
-          borderRadius: 100,
-          fontSize: 12.5,
-          fontFamily: 'var(--ff-body)',
-          color: 'var(--vdk)',
-          fontWeight: 500,
-          cursor: 'pointer',
-          textDecoration: 'none',
-          display: 'flex', alignItems: 'center',
-        }}>
-          About
-        </Link>
-
-        <Link href="/cart" style={{ position: 'relative', textDecoration: 'none' }}>
+        <Link href="/cart" className="navbar-cart-link" style={{ position: 'relative', textDecoration: 'none' }}>
           <div style={{
             width: 34, height: 34,
             background: 'var(--v)',

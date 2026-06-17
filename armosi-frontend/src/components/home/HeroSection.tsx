@@ -16,7 +16,7 @@ export function HeroSection() {
           fontSize: 11, letterSpacing: '.22em', textTransform: 'uppercase',
           color: 'var(--v)', fontWeight: 600, marginBottom: 10,
         }}>
-          New Collection 2025
+          New and Unique collections
         </div>
       </div>
 
